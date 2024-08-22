@@ -48,35 +48,20 @@ public class GithubRepositoryService {
             throw new IllegalArgumentException("Owner and repository name must not be null or empty");
         }
 
-        String repositoryId = owner + "/" + repositoryName;
-        Github github = githubRepository.findById(repositoryId).orElse(null);
-        if (github == null) {
-            github = fetchRepositoryDetailsFromGithub(owner, repositoryName);
+        String repositoryId = String.format("%s/%s", owner, repositoryName);
+        return githubRepository.findById(repositoryId)
+                .orElseGet(() -> fetchAndSaveRepositoryDetails(owner, repositoryName));
+    }
 
-            if (github != null) {
-
-                github.setId(repositoryId);
-                githubRepository.save(github);
-
-            }
+    private Github fetchAndSaveRepositoryDetails(String owner, String repositoryName) {
+        Github github = fetchRepositoryDetailsFromGithub(owner, repositoryName);
+        if (github != null) {
+            github.setId(String.format("%s/%s", owner, repositoryName));
+            githubRepository.save(github);
         }
         return github;
     }
 
-    /**
-     * Fetches the details of a GitHub repository from the GitHub API.
-     *
-     * @param owner          the owner of the repository
-     * @param repositoryName the name of the repository
-     * @return the GitHub repository details
-     */
-    /**
-     * Fetches the details of a GitHub repository from the GitHub API.
-     *
-     * @param owner          the owner of the repository
-     * @param repositoryName the name of the repository
-     * @return the GitHub repository details
-     */
     /**
      * Fetches the details of a GitHub repository from the GitHub API.
      *
@@ -98,13 +83,11 @@ public class GithubRepositoryService {
             ResponseEntity<Github> response = restTemplate.exchange(
                     GITHUB_API_URL, HttpMethod.GET, null, Github.class, uriVariables
             );
-            if (response.getStatusCode().equals(HttpStatus.OK)) {
-                LOGGER.info("Repository details fetched successfully from GitHub API for {}/{}", owner, repositoryName);
-                return response.getBody();
-            } else {
+            if (!response.getStatusCode().equals(HttpStatus.OK)) {
                 LOGGER.error("Failed to fetch repository details from GitHub API for {}/{}", owner, repositoryName);
                 throw new RuntimeException("Failed to fetch repository details");
             }
+            return response.getBody();
         } catch (HttpClientErrorException.NotFound e) {
             LOGGER.error("Repository not found on GitHub API for {}/{}", owner, repositoryName);
             throw new RepositoryNotFoundException(owner, repositoryName);
